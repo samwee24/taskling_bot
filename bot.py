@@ -276,13 +276,6 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Break into time/date parts
-    parts = when_str.split()
-    if len(parts) == 2:
-        time_str, date_str = parts
-    else:
-        time_str, date_str = parts[0], None
-
     due_ts = parse_time_date(time_str, date_str, tzname)
 
     if not due_ts:
