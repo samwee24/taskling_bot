@@ -274,7 +274,7 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # 👇 Use natural language parser
+    # 👇 Use natural language parser directly
     due_ts, _, _ = parse_when(when_str, tzname)
 
     if not due_ts:
