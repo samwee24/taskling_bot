@@ -80,19 +80,6 @@ def mark_done(chat_id, task_id):
         add_growth_on_completion(chat_id)
     return ok
 
-def list_tasks_for_day(chat_id, day_start_ts, day_end_ts):
-    conn = get_conn()
-    rows = conn.execute("""
-        SELECT id, text, due_ts, status
-        FROM tasks
-        WHERE chat_id = ?
-            AND status = 'pending'
-            AND ((due_ts BETWEEN ? AND ?) OR due_ts IS NULL)
-        ORDER BY id ASC
-    """, (chat_id, day_start_ts, day_end_ts)).fetchall()
-    conn.close()
-    return rows
-
 # --- Preferences ---
 def set_prefs(chat_id, summary_hour=None, timezone=None):
     conn = get_conn()
@@ -107,8 +94,30 @@ def set_prefs(chat_id, summary_hour=None, timezone=None):
     conn.close()
 
 def get_prefs(chat_id):
-    # Always default to Berkeley time (US/Pacific) and 9am summary
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT summary_hour, timezone FROM prefs WHERE chat_id=?",
+        (chat_id,)
+    ).fetchone()
+    conn.close()
+    if row:
+        return row  # (summary_hour, timezone)
+    # default if no prefs row exists
     return (9, "US/Pacific")
+
+
+def list_tasks_for_day(chat_id, day_start_ts, day_end_ts):
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT id, text, due_ts, status
+        FROM tasks
+        WHERE chat_id = ?
+          AND ((due_ts BETWEEN ? AND ?) OR due_ts IS NULL)
+        ORDER BY id ASC
+    """, (chat_id, day_start_ts, day_end_ts)).fetchall()
+    conn.close()
+    return rows
+
 
 
 # --- Growth mechanics ---

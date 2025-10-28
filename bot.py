@@ -661,7 +661,17 @@ async def reset_chat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         speak("All memory for this chat has been reset. Fresh start, commander!")
     )
 
+async def test_encouragement_cmd(update, context):
+    await context.bot.send_message(chat_id=update.effective_chat.id,
+                                   text=speak(random.choice(scheduler.ENCOURAGEMENTS)))
 
+from apscheduler.schedulers.background import BackgroundScheduler
+import scheduler
+
+async def debug_schedule_cmd(update, context):
+    jobs = scheduler.scheduler.get_jobs()
+    lines = [f"{job.id} → next run {job.next_run_time}" for job in jobs]
+    await update.message.reply_text("\n".join(lines) or "No jobs scheduled.")
 
 def inject_notify(app):
     import asyncio
@@ -703,6 +713,7 @@ def main():
     app.add_handler(CommandHandler("confirm_clear", confirm_clear_cmd))
     app.add_handler(CommandHandler("reschedule", reschedule_cmd))
     app.add_handler(CommandHandler("reset_chat", reset_chat_cmd))
+    app.add_handler(CommandHandler("debug_schedule", debug_schedule_cmd))
 
     inject_notify(app)
     scheduler.start()

@@ -45,7 +45,9 @@ def schedule_random_encouragements(app, chat_id, count=3):
     loop = asyncio.get_event_loop()
 
     async def encouragement():
-        points, streak, morale = db.get_growth(chat_id)
+        now = int(time.time())
+        start = now - (now % 86400)
+        end = start + 86400
         tasks = db.list_tasks_for_day(chat_id, start, end)
         done = sum(1 for _, _, _, status in tasks if status == "done")
 
@@ -57,7 +59,6 @@ def schedule_random_encouragements(app, chat_id, count=3):
             msg = random.choice(ENCOURAGEMENTS)
 
         await app.bot.send_message(chat_id=chat_id, text=speak(msg))
-
 
     now = datetime.now()
     end_of_day = datetime(now.year, now.month, now.day, 23, 59)
@@ -73,6 +74,7 @@ def schedule_random_encouragements(app, chat_id, count=3):
             replace_existing=False
         )
         print(f"[DEBUG] Scheduled random encouragement for chat {chat_id} at {trigger_time}")
+
 
 # --- Daily briefings (morning/midday/evening) ---
 def schedule_daily_briefings(app, chat_id):
@@ -96,23 +98,27 @@ def schedule_daily_briefings(app, chat_id):
 
         await app.bot.send_message(chat_id=chat_id, text=speak(msg))
 
+    # 👇 pull timezone from prefs
+    summary_hour, tzname = db.get_prefs(chat_id)
+    tz = pytz.timezone(tzname or "UTC")
+
     scheduler.add_job(lambda: loop.create_task(briefing("morning")),
-                      CronTrigger(hour=9, minute=0, timezone=PACIFIC),
+                      CronTrigger(hour=9, minute=0, timezone=tz),
                       id=f"briefing_morning_{chat_id}", replace_existing=True)
 
     scheduler.add_job(lambda: loop.create_task(briefing("midday")),
-                      CronTrigger(hour=13, minute=0, timezone=PACIFIC),
+                      CronTrigger(hour=13, minute=0, timezone=tz),
                       id=f"briefing_midday_{chat_id}", replace_existing=True)
 
     scheduler.add_job(lambda: loop.create_task(briefing("evening")),
-                      CronTrigger(hour=18, minute=0, timezone=PACIFIC),
+                      CronTrigger(hour=18, minute=0, timezone=tz),
                       id=f"briefing_evening_{chat_id}", replace_existing=True)
 
     scheduler.add_job(reset_daily_encouragements,
-                      CronTrigger(hour=0, minute=5, timezone=PACIFIC),
-                      id="reset_encouragements", replace_existing=True)
+                      CronTrigger(hour=0, minute=5, timezone=tz),
+                      id=f"reset_encouragements_{chat_id}", replace_existing=True)
 
-
+    print(f"[DEBUG] Scheduled daily briefings for chat {chat_id} in {tzname}")
 
 # --- Nightly debrief (23:59) ---
 def schedule_daily_debrief(app):
@@ -142,11 +148,9 @@ def schedule_daily_debrief(app):
             msg += "💪 Progress made, Phoebe. Tomorrow we march again."
         else:
             msg += "😴 No missions completed today, Phoebe. The squad rests uneasily…"
-            # Punishment: morale loss
             db.daily_decay(chat_id)
             msg += "\n⚠️ With no victories today, your Tasklings grow weary and vulnerable."
 
-        # Morale-based personalization
         if morale <= 3:
             msg += "\n😔 Phoebe, the squad’s morale is low. Even one mission tomorrow will lift their spirits."
         elif morale >= 9:
@@ -155,13 +159,16 @@ def schedule_daily_debrief(app):
         await app.bot.send_message(chat_id=chat_id, text=speak(msg))
 
     def schedule_for_chat(chat_id):
+        summary_hour, tzname = db.get_prefs(chat_id)
+        tz = pytz.timezone(tzname or "UTC")
+
         scheduler.add_job(
             lambda: loop.create_task(daily_debrief(chat_id)),
-            CronTrigger(hour=23, minute=59, timezone=PACIFIC),
+            CronTrigger(hour=summary_hour, minute=0, timezone=tz),
             id=f"daily_debrief_{chat_id}",
             replace_existing=True
         )
-        print(f"[DEBUG] Scheduled daily debrief for chat {chat_id}")
+        print(f"[DEBUG] Scheduled daily debrief for chat {chat_id} at {summary_hour}:00 {tzname}")
 
     return schedule_for_chat
 
