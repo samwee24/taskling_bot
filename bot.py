@@ -21,6 +21,8 @@ load_dotenv()
 # Track chats waiting for confirmation
 pending_clear = set()
 
+PACIFIC = pytz.timezone("US/Pacific")
+
 NAMES = [
     "Grizzle","Nyra","Fenn","Korra","Thistle","Brakk","Elowen","Drix","Veyra","Tumble",
     "Kaelen","Mosswick","Orin","Zephyra","Quill","Bramble","Liora","Korrin","Sylas","Tindra",
@@ -268,7 +270,8 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Save to DB
     db.add_task(chat_id, task_text, due_ts)
-    local_time = time.strftime("%Y-%m-%d %H:%M", time.localtime(due_ts))
+    PACIFIC = pytz.timezone("US/Pacific")
+    local_time = datetime.fromtimestamp(due_ts, PACIFIC).strftime("%Y-%m-%d %H:%M")
     await update.message.reply_text(speak(f"Mission added: {task_text} at {local_time}"))
 
 
@@ -297,7 +300,7 @@ async def remind_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Reminder time = due_ts as well (you can adjust if you want offset reminders)
     tid = db.add_task(chat_id, task_text, due_ts, due_ts)
-    local_time = time.strftime("%Y-%m-%d %H:%M", time.localtime(due_ts))
+    local_time = datetime.fromtimestamp(due_ts, PACIFIC).strftime("%Y-%m-%d %H:%M")
     await update.message.reply_text(speak(f"I’ll sound the horn for: {task_text} at {local_time}. Mission ID {tid}."))
 
 async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -328,8 +331,8 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     grouped = {}
     for tid, text, due_ts, status in rows:
         due_ts = int(due_ts)
-        date_str = time.strftime("%Y-%m-%d", time.localtime(due_ts))
-        time_str = time.strftime("%H:%M", time.localtime(due_ts))
+        date_str = datetime.fromtimestamp(due_ts, PACIFIC).strftime("%Y-%m-%d")
+        time_str = datetime.fromtimestamp(due_ts, PACIFIC).strftime("%H:%M")
         is_overdue = due_ts < now
         grouped.setdefault(date_str, []).append((time_str, text, is_overdue, due_ts))
 
@@ -575,7 +578,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         conn.close()
 
-        local_time = time.strftime("%Y-%m-%d %H:%M", time.localtime(due_ts))
+        local_time = datetime.fromtimestamp(due_ts, PACIFIC).strftime("%Y-%m-%d %H:%M")
         await update.message.reply_text(speak(f"Mission #{tid} rescheduled to {local_time}."))
         return
 
@@ -610,7 +613,7 @@ async def reschedule_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Build inline keyboard
     keyboard = [
-        [InlineKeyboardButton(f"{time.strftime('%Y-%m-%d %H:%M', time.localtime(due_ts))} — {text}",
+        [InlineKeyboardButton(f"{datetime.fromtimestamp(due_ts, PACIFIC).strftime('%Y-%m-%d %H:%M')} — {text}",
                               callback_data=f"resched:{tid}")]
         for tid, text, due_ts, status in rows
     ]

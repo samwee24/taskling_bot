@@ -13,6 +13,8 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+PACIFIC = pytz.timezone("US/Pacific")
+
 # --- Local modules ---
 import db
 from bot import speak, rank_for
@@ -95,19 +97,21 @@ def schedule_daily_briefings(app, chat_id):
         await app.bot.send_message(chat_id=chat_id, text=speak(msg))
 
     scheduler.add_job(lambda: loop.create_task(briefing("morning")),
-                      CronTrigger(hour=9, minute=0),
+                      CronTrigger(hour=9, minute=0, timezone=PACIFIC),
                       id=f"briefing_morning_{chat_id}", replace_existing=True)
+
     scheduler.add_job(lambda: loop.create_task(briefing("midday")),
-                      CronTrigger(hour=13, minute=0),
+                      CronTrigger(hour=13, minute=0, timezone=PACIFIC),
                       id=f"briefing_midday_{chat_id}", replace_existing=True)
+
     scheduler.add_job(lambda: loop.create_task(briefing("evening")),
-                      CronTrigger(hour=18, minute=0),
+                      CronTrigger(hour=18, minute=0, timezone=PACIFIC),
                       id=f"briefing_evening_{chat_id}", replace_existing=True)
-    # Reset encouragements for all chats at midnight
+
     scheduler.add_job(reset_daily_encouragements,
-                      CronTrigger(hour=0, minute=5),
-                      id="reset_encouragements",
-                      replace_existing=True)
+                      CronTrigger(hour=0, minute=5, timezone=PACIFIC),
+                      id="reset_encouragements", replace_existing=True)
+
 
 
 # --- Nightly debrief (23:59) ---
@@ -153,7 +157,7 @@ def schedule_daily_debrief(app):
     def schedule_for_chat(chat_id):
         scheduler.add_job(
             lambda: loop.create_task(daily_debrief(chat_id)),
-            CronTrigger(hour=23, minute=59),
+            CronTrigger(hour=23, minute=59, timezone=PACIFIC),
             id=f"daily_debrief_{chat_id}",
             replace_existing=True
         )
