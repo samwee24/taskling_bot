@@ -85,15 +85,21 @@ import pytz  # ensure you have pytz installed
 def parse_when_preview(raw: str, tzname: str):
     """Preview parse result without converting, used by splitter."""
     raw = normalize_shorthand(raw)
+
     settings = {
-        "PREFER_DATES_FROM": "future",
         "RELATIVE_BASE": now_in_tz(tzname),
         "RETURN_AS_TIMEZONE_AWARE": True,
     }
-    dt = dateparser.parse(raw, settings=settings)
-    return dt
 
-    import re
+    # If the user explicitly said "today", force today’s date
+    if "today" in raw:
+        settings["PREFER_DATES_FROM"] = "past"   # don’t bump forward
+    else:
+        settings["PREFER_DATES_FROM"] = "future"
+
+    dt = dateparser.parse(raw, settings=settings)
+
+    return dt
 
 def parse_time_date(time_str, date_str, tzname):
     tz = pytz.timezone(tzname or "UTC")
