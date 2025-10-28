@@ -60,21 +60,24 @@ def schedule_random_encouragements(app, chat_id, count=3):
 
         await app.bot.send_message(chat_id=chat_id, text=speak(msg))
 
+    # 👇 evenly spaced times between now and end of day
     now = datetime.now()
     end_of_day = datetime(now.year, now.month, now.day, 23, 59)
+    total_seconds = int((end_of_day - now).total_seconds())
+
+    # Divide the remaining day into (count+1) segments
+    interval = total_seconds // (count + 1)
 
     for i in range(count):
-        delta_seconds = int((end_of_day - now).total_seconds())
-        trigger_time = now + timedelta(seconds=random.randint(600, delta_seconds))
+        trigger_time = now + timedelta(seconds=(interval * (i + 1)))
 
         scheduler.add_job(
             lambda: loop.create_task(encouragement()),
             DateTrigger(run_date=trigger_time),
-            id=f"encouragement_{chat_id}_{i}_{trigger_time.hour}_{trigger_time.minute}",
+            id=f"encouragement_{chat_id}_{i}",
             replace_existing=False
         )
-        print(f"[DEBUG] Scheduled random encouragement for chat {chat_id} at {trigger_time}")
-
+        print(f"[DEBUG] Scheduled evenly spaced encouragement for chat {chat_id} at {trigger_time}")
 
 # --- Daily briefings (morning/midday/evening) ---
 def schedule_daily_briefings(app, chat_id):
@@ -253,7 +256,6 @@ def schedule_enemy_spawns(app, chat_id, count=2):
         if not squad:
             msg = f"👹 A wild {enemy} appears! But Phoebe has no Tasklings yet — the monster prowls unchallenged..."
         else:
-            # Pick 1–3 random Tasklings to highlight
             fighters = random.sample(squad, min(3, len(squad)))
             fighter_lines = ", ".join([f"{name} the {role}" for name, role in fighters])
 
@@ -263,14 +265,13 @@ def schedule_enemy_spawns(app, chat_id, count=2):
                     f"👹 A wild {enemy} appears!\n"
                     f"{fighter_lines} charge into battle and strike it down heroically!"
                 )
-                db.add_growth_on_completion(chat_id)  # reward
+                db.add_growth_on_completion(chat_id)
             else:
                 msg = (
                     f"👹 A wild {enemy} appears!\n"
                     f"{fighter_lines} fight bravely but are overwhelmed. "
                     f"The squad retreats, morale falters..."
                 )
-                # Punishment: morale drop + streak reset
                 db.daily_decay(chat_id)
                 conn = db.get_conn()
                 conn.execute("UPDATE growth SET streak=0 WHERE chat_id=?", (chat_id,))
@@ -279,4 +280,18 @@ def schedule_enemy_spawns(app, chat_id, count=2):
 
         await app.bot.send_message(chat_id=chat_id, text=speak(msg))
 
+    # 👇 evenly space the spawns across the rest of the day
+    now = datetime.now()
+    end_of_day = datetime(now.year, now.month, now.day, 23, 59)
+    total_seconds = int((end_of_day - now).total_seconds())
+    interval = total_seconds // (count + 1)
 
+    for i in range(count):
+        trigger_time = now + timedelta(seconds=interval * (i + 1))
+        scheduler.add_job(
+            lambda: loop.create_task(spawn_enemy()),
+            DateTrigger(run_date=trigger_time),
+            id=f"enemy_{chat_id}_{i}",
+            replace_existing=False
+        )
+        print(f"[DEBUG] Scheduled enemy spawn for chat {chat_id} at {trigger_time}")

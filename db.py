@@ -118,8 +118,6 @@ def list_tasks_for_day(chat_id, day_start_ts, day_end_ts):
     conn.close()
     return rows
 
-
-
 # --- Growth mechanics ---
 def add_growth_on_completion(chat_id):
     ensure_growth_row(chat_id)

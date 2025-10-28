@@ -661,9 +661,110 @@ async def reset_chat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         speak("All memory for this chat has been reset. Fresh start, commander!")
     )
 
+# --- Debug/Test Commands ---
+
 async def test_encouragement_cmd(update, context):
-    await context.bot.send_message(chat_id=update.effective_chat.id,
-                                   text=speak(random.choice(scheduler.ENCOURAGEMENTS)))
+    """Manually trigger a random encouragement."""
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=speak(random.choice(scheduler.ENCOURAGEMENTS))
+    )
+
+async def test_enemy_cmd(update, context):
+    """Manually trigger an enemy spawn encounter."""
+    chat_id = update.effective_chat.id
+    # Reuse the spawn_enemy logic from scheduler
+    enemy, difficulty = random.choice(scheduler.ENEMIES)
+    squad = db.list_squad(chat_id)
+    morale = db.get_growth(chat_id)[2]
+
+    if not squad:
+        msg = f"👹 A wild {enemy} appears! But Phoebe has no Tasklings yet — the monster prowls unchallenged..."
+    else:
+        fighters = random.sample(squad, min(3, len(squad)))
+        fighter_lines = ", ".join([f"{name} the {role}" for name, role in fighters])
+        power = len(squad) + morale
+        if power >= difficulty:
+            msg = (
+                f"👹 A wild {enemy} appears!\n"
+                f"{fighter_lines} charge into battle and strike it down heroically!"
+            )
+            db.add_growth_on_completion(chat_id)
+        else:
+            msg = (
+                f"👹 A wild {enemy} appears!\n"
+                f"{fighter_lines} fight bravely but are overwhelmed. "
+                f"The squad retreats, morale falters..."
+            )
+            db.daily_decay(chat_id)
+            conn = db.get_conn()
+            conn.execute("UPDATE growth SET streak=0 WHERE chat_id=?", (chat_id,))
+            conn.commit()
+            conn.close()
+
+    await context.bot.send_message(chat_id=chat_id, text=speak(msg))
+
+async def test_briefing_cmd(update, context):
+    """Manually trigger a briefing (morning/midday/evening)."""
+    chat_id = update.effective_chat.id
+    kind = "morning"
+    if context.args:
+        kind = context.args[0].lower()
+
+    now = int(time.time())
+    start = now - (now % 86400)
+    end = start + 86400
+    tasks = db.list_tasks_for_day(chat_id, start, end)
+    total = len(tasks)
+    done = sum(1 for _, _, _, status in tasks if status == "done")
+    rank = rank_for(db.get_growth(chat_id)[0])
+
+    if kind == "morning":
+        msg = f"🌅 Morning briefing, Phoebe: {total} missions today. Current rank: {rank}."
+    elif kind == "midday":
+        msg = f"⚔️ Midday check‑in, Phoebe: {done}/{total} missions complete."
+    elif kind == "evening":
+        msg = f"🛡️ Evening rally, Phoebe: {total - done} missions remain. Stay sharp!"
+    else:
+        msg = f"Unknown briefing type '{kind}'. Use morning/midday/evening."
+
+    await context.bot.send_message(chat_id=chat_id, text=speak(msg))
+
+async def test_debrief_cmd(update, context):
+    """Manually trigger the daily debrief."""
+    chat_id = update.effective_chat.id
+    now = int(time.time())
+    start = now - (now % 86400)
+    end = start + 86400
+
+    tasks = db.list_tasks_for_day(chat_id, start, end)
+    total = len(tasks)
+    done = sum(1 for _, _, _, status in tasks if status == "done")
+
+    points, streak, morale = db.get_growth(chat_id)
+    rank = rank_for(points)
+
+    msg = (
+        f"📜 Daily Debrief for Phoebe ({datetime.now().strftime('%Y-%m-%d')})\n"
+        f"Completed: {done}/{total} missions\n"
+        f"Current Rank: {rank}\n"
+        f"Streak: {streak} days | Morale: {morale}/10\n"
+    )
+    if total > 0 and done == total:
+        msg += "🎉 Perfect day, Phoebe! The squad celebrates your leadership."
+    elif done > 0:
+        msg += "💪 Progress made, Phoebe. Tomorrow we march again."
+    else:
+        msg += "😴 No missions completed today, Phoebe. The squad rests uneasily…"
+        db.daily_decay(chat_id)
+        msg += "\n⚠️ With no victories today, your Tasklings grow weary and vulnerable."
+
+    if morale <= 3:
+        msg += "\n😔 Phoebe, the squad’s morale is low. Even one mission tomorrow will lift their spirits."
+    elif morale >= 9:
+        msg += "\n🔥 Phoebe, the Tasklings are jubilant — your leadership is legendary."
+
+    await context.bot.send_message(chat_id=chat_id, text=speak(msg))
 
 from apscheduler.schedulers.background import BackgroundScheduler
 import scheduler
@@ -713,7 +814,10 @@ def main():
     app.add_handler(CommandHandler("confirm_clear", confirm_clear_cmd))
     app.add_handler(CommandHandler("reschedule", reschedule_cmd))
     app.add_handler(CommandHandler("reset_chat", reset_chat_cmd))
-    app.add_handler(CommandHandler("debug_schedule", debug_schedule_cmd))
+    app.add_handler(CommandHandler("test_encouragement", test_encouragement_cmd))
+    app.add_handler(CommandHandler("test_enemy", test_enemy_cmd))
+    app.add_handler(CommandHandler("test_briefing", test_briefing_cmd))
+    app.add_handler(CommandHandler("test_debrief", test_debrief_cmd))
 
     inject_notify(app)
     scheduler.start()
