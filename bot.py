@@ -770,9 +770,17 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import scheduler
 
 async def debug_schedule_cmd(update, context):
+    """List all scheduled jobs with their next run times."""
     jobs = scheduler.scheduler.get_jobs()
-    lines = [f"{job.id} → next run {job.next_run_time}" for job in jobs]
-    await update.message.reply_text("\n".join(lines) or "No jobs scheduled.")
+    if not jobs:
+        await update.message.reply_text("No jobs scheduled.")
+        return
+
+    lines = []
+    for job in jobs:
+        lines.append(f"{job.id} → next run {job.next_run_time}")
+    await update.message.reply_text("\n".join(lines))
+
 
 def inject_notify(app):
     import asyncio
@@ -827,8 +835,10 @@ def main():
     app.add_handler(CommandHandler("test_enemy", test_enemy_cmd))
     app.add_handler(CommandHandler("test_briefing", test_briefing_cmd))
     app.add_handler(CommandHandler("test_debrief", test_debrief_cmd))
+    app.add_handler(CommandHandler("debug_schedule", debug_schedule_cmd))
 
-    inject_notify(app)
+
+inject_notify(app)
     scheduler.start()
     scheduler.app_ref = app
 
