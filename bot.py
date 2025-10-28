@@ -201,15 +201,26 @@ def speak(text: str) -> str:
 # --- Command Handlers ---
 
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Onboarding message when a user first starts the bot."""
     chat_id = update.effective_chat.id
     db.init_db()
     db.ensure_growth_row(chat_id)
-    await update.message.reply_text(speak(
-        "Greetings, Commander Tan! I’m Taskling—your masked helper. "
-        "Complete tasks to recruit more of my kin into your squad..."
-    ))
 
-    # Schedule daily debrief for this chat
+    intro_text = (
+        "🎭 Greetings, Commander Tan! I am Taskling — your masked helper.\n\n"
+        "Here’s how our adventure works:\n"
+        "• Use /add or /remind to assign *missions* (your real‑world tasks).\n"
+        "• When you complete a mission, mark it with /done — and a new Taskling will join your squad!\n"
+        "• Each night you’ll receive a 📜 Daily Debrief with your victories, streak, and morale.\n"
+        "• Fail to act, and morale drops… but rally your squad and you’ll rise in rank.\n"
+        "• Beware: 👹 random enemies may appear. Your squad’s strength and morale decide the outcome.\n\n"
+        "Type /help anytime for the full command guide.\n\n"
+        "Now, commander — what is our first mission?"
+    )
+
+    await update.message.reply_text(intro_text, parse_mode="Markdown")
+
+    # Schedule daily debrief + other jobs for this chat
     schedule_for_chat = scheduler.schedule_daily_debrief(context.application)
     schedule_for_chat(chat_id)
     scheduler.schedule_random_encouragements(context.application, chat_id, count=3)
@@ -482,30 +493,33 @@ def recruit_taskling(chat_id):
     return recruit, role
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show available commands and syntax."""
+    """Detailed command reference with a short 'how it works' preface."""
     help_text = (
         "🎭 *Taskling Command Guide*\n\n"
-        "/start – Begin your adventure with Taskling\n"
-        "/help – Show this help message\n\n"
+        "⚔️ *How it works:*\n"
+        "- Add missions with /add or /remind.\n"
+        "- Complete missions with /done to recruit Tasklings.\n"
+        "- Check your squad’s status with /squad.\n"
+        "- Each night you’ll receive a Daily Debrief.\n"
+        "- Stay active to keep morale high and defeat enemies!\n\n"
+        "*Available commands:*\n"
+        "/start – Begin your adventure\n"
+        "/help – Show this guide\n\n"
         "/add <task> <time> [date] – Add a new mission\n"
-        "   Time formats accepted: HHMM, HH:MM, or 12h with am/pm (e.g. 1700, 09:30, 5pm, 6:15am)\n"
-        "   Date formats accepted: DDMMYY, 'today', 'tomorrow' (default is today if omitted)\n"
+        "   Time formats: HHMM, HH:MM, or 12h with am/pm (e.g. 1700, 09:30, 5pm)\n"
+        "   Date formats: DDMMYY, 'today', 'tomorrow' (default is today)\n"
         "   e.g. /add Finish report 1700\n"
-        "   e.g. /add Homework 07:30 tomorrow\n"
-        "   e.g. /add Call mom 5pm 281025\n\n"
+        "   e.g. /add Homework 07:30 tomorrow\n\n"
         "/remind <task> <time> [date] – Add a mission with a reminder\n"
         "   e.g. /remind Call mom 1900\n"
-        "   e.g. /remind Meeting 09:00 tomorrow\n"
-        "   e.g. /remind Workout 6am 281025\n\n"
-        "/summary – Show all missions grouped by date (⚠️ marks overdue)\n\n"
-        "/done – Mark a mission complete (choose from a list)\n\n"
-        "/delete – Remove a mission completely (choose from a list)\n\n"
+        "   e.g. /remind Meeting 09:00 tomorrow\n\n"
+        "/summary – Show all missions grouped by date (⚠️ overdue)\n"
+        "/done – Mark a mission complete (choose from a list)\n"
+        "/delete – Remove a mission completely (choose from a list)\n"
         "/reschedule – Select a mission to reschedule, then reply with a new time/date\n"
-        "   e.g. 1600\n"
-        "   e.g. 07:45 tomorrow\n"
-        "   e.g. 5pm 281025\n\n"
-        "/clear_all – Wipe all missions for today’s squad\n\n"
-        "/squad – Show your current Taskling squad status\n\n"
+        "/clear_all – Wipe all missions for today’s squad\n"
+        "/squad – Show your current Taskling squad status\n"
+        "/reset_chat – Reset everything for a fresh start\n"
     )
     await update.message.reply_text(help_text, parse_mode="Markdown")
 
