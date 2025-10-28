@@ -488,25 +488,26 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/start – Begin your adventure with Taskling\n"
         "/help – Show this help message\n\n"
         "/add <task> <time> [date] – Add a new mission\n"
+        "   Time formats accepted: HHMM, HH:MM, or 12h with am/pm (e.g. 1700, 09:30, 5pm, 6:15am)\n"
+        "   Date formats accepted: DDMMYY, 'today', 'tomorrow' (default is today if omitted)\n"
         "   e.g. /add Finish report 1700\n"
-        "   e.g. /add Homework 1700 281025\n"
-        "   e.g. /add Call mom 5pm tomorrow\n\n"
+        "   e.g. /add Homework 07:30 tomorrow\n"
+        "   e.g. /add Call mom 5pm 281025\n\n"
         "/remind <task> <time> [date] – Add a mission with a reminder\n"
         "   e.g. /remind Call mom 1900\n"
-        "   e.g. /remind Meeting 09:00 next Monday\n\n"
+        "   e.g. /remind Meeting 09:00 tomorrow\n"
+        "   e.g. /remind Workout 6am 281025\n\n"
         "/summary – Show all missions grouped by date (⚠️ marks overdue)\n\n"
         "/done – Mark a mission complete (choose from a list)\n\n"
         "/delete – Remove a mission completely (choose from a list)\n\n"
         "/reschedule – Select a mission to reschedule, then reply with a new time/date\n"
         "   e.g. 1600\n"
-        "   e.g. 1600 281025\n"
-        "   e.g. 5pm tomorrow\n\n"
-        "/clear\\_all – Wipe all missions for today’s squad\n\n"
+        "   e.g. 07:45 tomorrow\n"
+        "   e.g. 5pm 281025\n\n"
+        "/clear_all – Wipe all missions for today’s squad\n\n"
         "/squad – Show your current Taskling squad status\n\n"
     )
     await update.message.reply_text(help_text, parse_mode="Markdown")
-
-
 
 async def remap_ids_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.remap_task_ids()
@@ -600,6 +601,27 @@ async def reschedule_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Select a mission to reschedule:", reply_markup=reply_markup)
 
+async def reset_chat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+
+    # Clear tasks
+    db.clear_all_tasks(chat_id)
+
+    # Clear squad
+    conn = db.get_conn()
+    conn.execute("DELETE FROM squad WHERE chat_id=?", (chat_id,))
+    conn.execute("DELETE FROM growth WHERE chat_id=?", (chat_id,))
+    conn.commit()
+    conn.close()
+
+    # Re‑initialize growth row so the bot doesn’t break
+    db.ensure_growth_row(chat_id)
+
+    await update.message.reply_text(
+        speak("All memory for this chat has been reset. Fresh start, commander!")
+    )
+
+
 
 def inject_notify(app):
     import asyncio
@@ -640,6 +662,7 @@ def main():
     app.add_handler(CommandHandler("clear_all", clear_all_cmd))
     app.add_handler(CommandHandler("confirm_clear", confirm_clear_cmd))
     app.add_handler(CommandHandler("reschedule", reschedule_cmd))
+    app.add_handler(CommandHandler("reset_chat", reset_chat_cmd))
 
     inject_notify(app)
     scheduler.start()
