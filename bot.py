@@ -838,7 +838,7 @@ def main():
     app.add_handler(CommandHandler("debug_schedule", debug_schedule_cmd))
 
 
-inject_notify(app)
+    inject_notify(app)
     scheduler.start()
     scheduler.app_ref = app
 
