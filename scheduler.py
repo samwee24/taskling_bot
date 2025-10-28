@@ -41,7 +41,7 @@ def start():
     print("⚙️ Scheduler started with jobs: reminders, due, decay")
 
 # --- Random encouragements ---
-def schedule_random_encouragements(app, chat_id, count=3):
+def schedule_random_encouragements(app, chat_id, count=5):
     loop = asyncio.get_event_loop()
 
     async def encouragement():
@@ -52,7 +52,7 @@ def schedule_random_encouragements(app, chat_id, count=3):
         done = sum(1 for _, _, _, status in tasks if status == "done")
 
         if done == 0:
-            msg = f"Phoebe, the squad is restless — let’s rally for our first victory today!"
+            msg = "Phoebe, the squad is restless — let’s rally for our first victory today!"
         elif done >= len(tasks) // 2:
             msg = f"Phoebe, you’re leading well — only {len(tasks)-done} missions remain!"
         else:
@@ -60,24 +60,26 @@ def schedule_random_encouragements(app, chat_id, count=3):
 
         await app.bot.send_message(chat_id=chat_id, text=speak(msg))
 
-    # 👇 evenly spaced times between now and end of day
-    now = datetime.now()
-    end_of_day = datetime(now.year, now.month, now.day, 23, 59)
-    total_seconds = int((end_of_day - now).total_seconds())
+    # 👇 evenly spaced between 7 AM today and 2 AM tomorrow
+    summary_hour, tzname = db.get_prefs(chat_id)
+    tz = pytz.timezone(tzname or "UTC")
 
-    # Divide the remaining day into (count+1) segments
+    now = datetime.now(tz)
+    start_of_window = tz.localize(datetime(now.year, now.month, now.day, 7, 0))
+    end_of_window = start_of_window + timedelta(hours=19)  # until 2 AM next day
+
+    total_seconds = int((end_of_window - start_of_window).total_seconds())
     interval = total_seconds // (count + 1)
 
     for i in range(count):
-        trigger_time = now + timedelta(seconds=(interval * (i + 1)))
-
+        trigger_time = start_of_window + timedelta(seconds=interval * (i + 1))
         scheduler.add_job(
             lambda: loop.create_task(encouragement()),
             DateTrigger(run_date=trigger_time),
             id=f"encouragement_{chat_id}_{i}",
-            replace_existing=False
+            replace_existing=True
         )
-        print(f"[DEBUG] Scheduled evenly spaced encouragement for chat {chat_id} at {trigger_time}")
+        print(f"[DEBUG] Scheduled encouragement for chat {chat_id} at {trigger_time}")
 
 # --- Daily briefings (morning/midday/evening) ---
 def schedule_daily_briefings(app, chat_id):
@@ -211,11 +213,12 @@ def _clear_reminder(task_id):
     conn.close()
     print(f"[DEBUG] Cleared reminder flag for task {task_id}")
 
+
 def check_due():
     now = int(time.time())
-    window = now + 120
-    rows = db.due_tasks_between(now, window)
-    print(f"[DEBUG] check_due at {time.ctime(now)} → {len(rows)} tasks in window")
+    rows = db.due_tasks_between(0, now)  # catch all due/overdue tasks
+    print(f"[DEBUG] check_due at {time.ctime(now)} → {len(rows)} tasks due/overdue")
+
     for tid, chat_id, text, due_ts in rows:
         print(f"[DEBUG] Sending due alert for task {tid}: {text}")
         keyboard = InlineKeyboardMarkup([
@@ -229,11 +232,12 @@ def check_due():
             "reply_markup": keyboard
         })
 
-        # 🔑 Mark as alerted so it won’t fire again
+        # mark as alerted so it won’t fire again
         conn = db.get_conn()
         conn.execute("UPDATE tasks SET due_alerted=1 WHERE id=?", (tid,))
         conn.commit()
         conn.close()
+
 
 def apply_daily_decay():
     print(f"[DEBUG] apply_daily_decay triggered at {time.ctime()}")
@@ -280,18 +284,23 @@ def schedule_enemy_spawns(app, chat_id, count=2):
 
         await app.bot.send_message(chat_id=chat_id, text=speak(msg))
 
-    # 👇 evenly space the spawns across the rest of the day
-    now = datetime.now()
-    end_of_day = datetime(now.year, now.month, now.day, 23, 59)
-    total_seconds = int((end_of_day - now).total_seconds())
+    # 👇 evenly spaced between 7 AM today and 2 AM tomorrow
+    summary_hour, tzname = db.get_prefs(chat_id)
+    tz = pytz.timezone(tzname or "UTC")
+
+    now = datetime.now(tz)
+    start_of_window = tz.localize(datetime(now.year, now.month, now.day, 7, 0))
+    end_of_window = start_of_window + timedelta(hours=19)  # until 2 AM next day
+
+    total_seconds = int((end_of_window - start_of_window).total_seconds())
     interval = total_seconds // (count + 1)
 
     for i in range(count):
-        trigger_time = now + timedelta(seconds=interval * (i + 1))
+        trigger_time = start_of_window + timedelta(seconds=interval * (i + 1))
         scheduler.add_job(
             lambda: loop.create_task(spawn_enemy()),
             DateTrigger(run_date=trigger_time),
             id=f"enemy_{chat_id}_{i}",
-            replace_existing=False
+            replace_existing=True
         )
         print(f"[DEBUG] Scheduled enemy spawn for chat {chat_id} at {trigger_time}")
