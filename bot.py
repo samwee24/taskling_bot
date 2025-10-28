@@ -840,6 +840,11 @@ def main():
 
     inject_notify(app)
     scheduler.start()
+
+    # Clear out any old jobs (like hex IDs from previous versions)
+    scheduler.scheduler.remove_all_jobs()
+    print("[DEBUG] Cleared all old jobs at startup")
+
     scheduler.app_ref = app
 
     log_all_jobs()
