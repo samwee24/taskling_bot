@@ -238,14 +238,25 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def split_task_and_when(args, tzname):
-    """Return (task_text, when_str) using the longest parsable suffix."""
+    """
+    Return (task_text, when_str) by trying the longest suffix that parses as a time/date.
+    Handles both '10:53pm' and '10:53 pm'.
+    """
     best = (None, None)
     for i in range(1, len(args) + 1):
         task_text = " ".join(args[:-i]).strip()
         when_str = " ".join(args[-i:]).strip()
-        if parse_when_preview(when_str, tzname) is not None:
-            best = (task_text, when_str)
+
+        # Normalize shorthand and am/pm spacing
+        when_str_norm = normalize_shorthand(when_str)
+        when_str_norm = when_str_norm.replace("am", " am").replace("pm", " pm")
+        when_str_norm = re.sub(r"\s+", " ", when_str_norm).strip()
+
+        dt = parse_when_preview(when_str_norm, tzname)
+        if dt is not None:
+            best = (task_text, when_str_norm)
     return best
+
 
 async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Add a new mission with a due time/date."""
