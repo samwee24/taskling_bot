@@ -267,7 +267,7 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sh, tzname = db.get_prefs(chat_id)
 
-    # 👇 Use the same smart splitter as /remind
+    # 👇 Use the smart splitter
     task_text, when_str = split_task_and_when(context.args, tzname)
 
     if not task_text or not when_str:
@@ -296,6 +296,7 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     PACIFIC = pytz.timezone("US/Pacific")
     local_time = datetime.fromtimestamp(due_ts, PACIFIC).strftime("%Y-%m-%d %H:%M")
     await update.message.reply_text(speak(f"Mission added: {task_text} at {local_time}"))
+
 
 
 async def remind_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
