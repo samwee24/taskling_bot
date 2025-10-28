@@ -1,4 +1,3 @@
-# db.py
 import sqlite3, time
 
 def get_conn():
@@ -16,13 +15,16 @@ def init_db():
         due_ts INTEGER,
         remind_ts INTEGER,
         status TEXT NOT NULL DEFAULT 'pending',
-        created_ts INTEGER NOT NULL
+        created_ts INTEGER NOT NULL,
+        due_alerted INTEGER DEFAULT 0   -- 👈 new column
     );
+
     CREATE TABLE IF NOT EXISTS prefs (
         chat_id INTEGER PRIMARY KEY,
         summary_hour INTEGER DEFAULT 8,
         timezone TEXT DEFAULT 'UTC'
     );
+
     CREATE TABLE IF NOT EXISTS growth (
         chat_id INTEGER PRIMARY KEY,
         points INTEGER DEFAULT 0,
@@ -30,6 +32,7 @@ def init_db():
         last_completed_day INTEGER DEFAULT 0,
         morale INTEGER DEFAULT 5
     );
+
     CREATE TABLE IF NOT EXISTS squad (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         chat_id INTEGER NOT NULL,
@@ -37,21 +40,11 @@ def init_db():
         role TEXT NOT NULL,
         joined_ts INTEGER NOT NULL
     );
-
-    CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        chat_id INTEGER,
-        text TEXT,
-        due_ts INTEGER,
-        remind_ts INTEGER,
-        status TEXT,
-        due_alerted INTEGER DEFAULT 0
-    )
-        """)
-
+    """)
     conn.commit()
     conn.close()
     ensure_growth_columns()
+
 
 
 # --- Task functions ---
@@ -203,7 +196,7 @@ def delete_task(chat_id, task_id):
 def remap_task_ids():
     conn = get_conn()
     tasks = conn.execute("""
-        SELECT chat_id, text, due_ts, remind_ts, status, created_ts
+        SELECT chat_id, text, due_ts, remind_ts, status, created_ts, due_alerted
         FROM tasks
         ORDER BY id ASC
     """).fetchall()
@@ -217,21 +210,21 @@ def remap_task_ids():
             due_ts INTEGER,
             remind_ts INTEGER,
             status TEXT NOT NULL DEFAULT 'pending',
-            created_ts INTEGER NOT NULL
+            created_ts INTEGER NOT NULL,
+            due_alerted INTEGER DEFAULT 0
         );
     """)
 
     for task in tasks:
         conn.execute("""
-            INSERT INTO tasks (chat_id, text, due_ts, remind_ts, status, created_ts)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO tasks (chat_id, text, due_ts, remind_ts, status, created_ts, due_alerted)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, task)
 
-    # Reset the AUTOINCREMENT counter back to max(id) or 0
     conn.execute("DELETE FROM sqlite_sequence WHERE name='tasks'")
-
     conn.commit()
     conn.close()
+
 
 
 def clear_all_tasks(chat_id):
