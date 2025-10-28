@@ -2,7 +2,6 @@
 import dateparser
 from dateutil import parser
 import time, pytz, datetime as dt
-
 import datetime as dt
 import pytz
 
@@ -11,17 +10,39 @@ def parse_when(raw: str, tzname: str):
     tz = pytz.timezone(tzname or "UTC")
     now = now_in_tz(tzname)
 
-    # 👇 Intercept bare 4-digit times like "2227"
+    # --- Case 1: HHMM (e.g. 2227 → 22:27) ---
     if re.fullmatch(r"\d{4}", raw):
         hour = int(raw[:2])
         minute = int(raw[2:])
         due_dt = tz.localize(dt.datetime(now.year, now.month, now.day, hour, minute))
-        # If that time already passed today, bump to tomorrow
         if due_dt < now:
             due_dt += dt.timedelta(days=1)
         return int(due_dt.timestamp()), None, None
 
-    # Otherwise, fall back to dateparser
+    # --- Case 2: HH:MM (24h) ---
+    if re.fullmatch(r"\d{1,2}:\d{2}", raw):
+        hour, minute = map(int, raw.split(":"))
+        due_dt = tz.localize(dt.datetime(now.year, now.month, now.day, hour, minute))
+        if due_dt < now:
+            due_dt += dt.timedelta(days=1)
+        return int(due_dt.timestamp()), None, None
+
+    # --- Case 3: 12h with am/pm (e.g. 10pm, 11:30am) ---
+    if re.fullmatch(r"\d{1,2}(:\d{2})?\s*(am|pm)", raw.lower()):
+        m = re.match(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)", raw.lower())
+        hour = int(m.group(1))
+        minute = int(m.group(2) or 0)
+        ampm = m.group(3)
+        if ampm == "pm" and hour != 12:
+            hour += 12
+        if ampm == "am" and hour == 12:
+            hour = 0
+        due_dt = tz.localize(dt.datetime(now.year, now.month, now.day, hour, minute))
+        if due_dt < now:
+            due_dt += dt.timedelta(days=1)
+        return int(due_dt.timestamp()), None, None
+
+    # --- Otherwise, fall back to dateparser ---
     settings = {
         "RELATIVE_BASE": now,
         "RETURN_AS_TIMEZONE_AWARE": True,
@@ -35,6 +56,7 @@ def parse_when(raw: str, tzname: str):
     if not dt_parsed:
         return None, None, None
     return int(dt_parsed.timestamp()), None, None
+
 
 
 import re
