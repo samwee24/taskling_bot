@@ -41,7 +41,7 @@ def start():
     print("⚙️ Scheduler started with jobs: reminders, due, decay")
 
 # --- Random encouragements ---
-def schedule_random_encouragements(app, chat_id, count=5):
+def schedule_random_encouragements(app, chat_id, count=8):
     loop = asyncio.get_event_loop()
 
     async def encouragement():

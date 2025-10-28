@@ -232,7 +232,7 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Schedule daily debrief + other jobs for this chat
     schedule_for_chat = scheduler.schedule_daily_debrief(context.application)
     schedule_for_chat(chat_id)
-    scheduler.schedule_random_encouragements(context.application, chat_id, count=3)
+    scheduler.schedule_random_encouragements(context.application, chat_id, count=8)
     scheduler.schedule_daily_briefings(context.application, chat_id)
     scheduler.schedule_enemy_spawns(context.application, chat_id, count=2)
 
@@ -857,17 +857,20 @@ def main():
 
 
     inject_notify(app)
+
+    # Clear out any old jobs BEFORE starting
     scheduler.scheduler.remove_all_jobs()
     print("[DEBUG] Cleared all old jobs at startup")
 
+    # Now start scheduler (adds check_due, check_reminders, decay)
     scheduler.start()
-
     scheduler.app_ref = app
 
     for job in scheduler.scheduler.get_jobs():
         print(f"[DEBUG] Job {job.id} → next run {job.next_run_time}")
 
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
