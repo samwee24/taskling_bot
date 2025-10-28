@@ -394,10 +394,14 @@ async def done_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def delete_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    now = int(time.time())
-    start = now - (now % 86400)
-    end = start + 86400
-    tasks = db.list_tasks_for_day(chat_id, start, end)
+    conn = db.get_conn()
+    tasks = conn.execute("""
+        SELECT id, text, due_ts, status
+        FROM tasks
+        WHERE chat_id=? AND (status IS NULL OR status!='done')
+        ORDER BY due_ts ASC
+    """, (chat_id,)).fetchall()
+    conn.close()
 
     if not tasks:
         await update.message.reply_text("No pending missions to delete.")
