@@ -315,7 +315,6 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sh, tzname = db.get_prefs(chat_id)
     now = int(time.time())
 
-    # Pull all tasks with a due time that aren’t marked done
     conn = db.get_conn()
     rows = conn.execute(
         """
@@ -334,7 +333,6 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(speak("No missions on the horizon. The squad rests."))
         return
 
-    # Group tasks by date
     grouped = {}
     for tid, text, due_ts, status in rows:
         due_ts = int(due_ts)
@@ -343,23 +341,21 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_overdue = due_ts < now
         grouped.setdefault(date_str, []).append((time_str, text, is_overdue, due_ts))
 
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    parts = []
+    today_str = datetime.now(PACIFIC).strftime("%Y-%m-%d")
+    tomorrow_str = (datetime.now(PACIFIC) + timedelta(days=1)).strftime("%Y-%m-%d")
 
+    parts = []
     for i, date_str in enumerate(sorted(grouped.keys())):
-        # Divider between dates
         if i > 0:
             parts.append("\n")
 
-        # Header
         if date_str == today_str:
             parts.append(f"🌟 TODAY ({date_str})")
-        elif date_str == (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"):
+        elif date_str == tomorrow_str:
             parts.append(f"🌙 TOMORROW ({date_str})")
         else:
             parts.append(f"📅 {date_str}")
 
-        # Tasks under this date
         for time_str, text, is_overdue, due_ts in grouped[date_str]:
             delta = due_ts - now
             if is_overdue:
@@ -370,10 +366,8 @@ async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 marker = "•"
             parts.append(f"{marker} {time_str} — {text}")
 
-    # Send everything in one message
     msg = "\n".join(parts)
     await update.message.reply_text(speak(msg))
-
 
 async def done_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
