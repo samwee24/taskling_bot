@@ -793,6 +793,15 @@ def inject_notify(app):
 
     scheduler.notify = threadsafe_notify
 
+def log_all_jobs():
+    jobs = scheduler.scheduler.get_jobs()
+    print("=== Scheduled Jobs ===")
+    if not jobs:
+        print("No jobs scheduled.")
+    for job in jobs:
+        print(f"{job.id} → next run {job.next_run_time}")
+    print("======================")
+
 # --- Main entrypoint ---
 def main():
     db.init_db()
@@ -822,6 +831,8 @@ def main():
     inject_notify(app)
     scheduler.start()
     scheduler.app_ref = app
+
+    log_all_jobs()
 
     app.run_polling()
 
