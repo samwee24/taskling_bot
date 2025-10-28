@@ -260,6 +260,7 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         when_str = " ".join(context.args[-2:])
 
     # Use time_utils.parse_when for natural language parsing
+    when_str = normalize_shorthand(when_str)
     due_ts, _, _ = parse_when(when_str, tzname)
 
     if not due_ts or not task_text:
