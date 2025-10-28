@@ -44,8 +44,18 @@ def init_db():
     conn.commit()
     conn.close()
     ensure_growth_columns()
+    ensure_task_columns()   # 👈 add this helper
 
 
+def ensure_task_columns():
+    conn = get_conn()
+    try:
+        conn.execute("ALTER TABLE tasks ADD COLUMN due_alerted INTEGER DEFAULT 0")
+        conn.commit()
+    except sqlite3.OperationalError:
+        # Column already exists
+        pass
+    conn.close()
 
 
 # --- Task functions ---
@@ -225,6 +235,7 @@ def remap_task_ids():
     conn.execute("DELETE FROM sqlite_sequence WHERE name='tasks'")
     conn.commit()
     conn.close()
+
 
 def clear_all_tasks(chat_id):
     conn = get_conn()
