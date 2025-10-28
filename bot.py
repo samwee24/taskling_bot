@@ -205,7 +205,7 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.init_db()
     db.ensure_growth_row(chat_id)
     await update.message.reply_text(speak(
-        "Greetings, commander! I’m Taskling—your masked helper. "
+        "Greetings, Commander Tan! I’m Taskling—your masked helper. "
         "Complete tasks to recruit more of my kin into your squad..."
     ))
 
