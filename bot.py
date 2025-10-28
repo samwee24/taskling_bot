@@ -274,7 +274,8 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # 👇 Use natural language parser directly
+    # 👇 Normalize shorthand and feed directly to parse_when
+    when_str = normalize_shorthand(when_str)
     due_ts, _, _ = parse_when(when_str, tzname)
 
     if not due_ts:
@@ -287,6 +288,7 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     PACIFIC = pytz.timezone("US/Pacific")
     local_time = datetime.fromtimestamp(due_ts, PACIFIC).strftime("%Y-%m-%d %H:%M")
     await update.message.reply_text(speak(f"Mission added: {task_text} at {local_time}"))
+
 
 async def remind_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
