@@ -3,32 +3,39 @@ import dateparser
 from dateutil import parser
 import time, pytz, datetime as dt
 
+import datetime as dt
+import pytz
+
 def parse_when(raw: str, tzname: str):
     raw = normalize_shorthand(raw)
+    tz = pytz.timezone(tzname or "UTC")
+    now = now_in_tz(tzname)
 
+    # 👇 Intercept bare 4-digit times like "2227"
+    if re.fullmatch(r"\d{4}", raw):
+        hour = int(raw[:2])
+        minute = int(raw[2:])
+        due_dt = tz.localize(dt.datetime(now.year, now.month, now.day, hour, minute))
+        # If that time already passed today, bump to tomorrow
+        if due_dt < now:
+            due_dt += dt.timedelta(days=1)
+        return int(due_dt.timestamp()), None, None
+
+    # Otherwise, fall back to dateparser
     settings = {
-        "RELATIVE_BASE": now_in_tz(tzname),
+        "RELATIVE_BASE": now,
         "RETURN_AS_TIMEZONE_AWARE": True,
     }
-
-    # 👇 Key fix: if user explicitly said "today", don’t bump forward
     if "today" in raw:
         settings["PREFER_DATES_FROM"] = "past"
     else:
         settings["PREFER_DATES_FROM"] = "future"
 
-    dt = dateparser.parse(raw, settings=settings)
-    if not dt:
+    dt_parsed = dateparser.parse(raw, settings=settings)
+    if not dt_parsed:
         return None, None, None
-    return int(dt.timestamp()), None, None
+    return int(dt_parsed.timestamp()), None, None
 
-
-def day_bounds(tzname='UTC', when=None):
-    zone = pytz.timezone(tzname)
-    now_local = dt.datetime.now(zone) if when is None else zone.localize(when)
-    start = zone.localize(dt.datetime(now_local.year, now_local.month, now_local.day, 0, 0, 0))
-    end = start + dt.timedelta(days=1) - dt.timedelta(seconds=1)
-    return int(start.astimezone(pytz.UTC).timestamp()), int(end.astimezone(pytz.UTC).timestamp())
 
 import re
 
