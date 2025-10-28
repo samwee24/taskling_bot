@@ -266,14 +266,19 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         when_str = " ".join(context.args[-2:])
 
     # Use time_utils.parse_when for natural language parsing
-    when_str = normalize_shorthand(when_str)
-    due_ts, _, _ = parse_when(when_str, tzname)
+    parts = when_str.split()
+    if len(parts) == 2:
+        time_str, date_str = parts
+    else:
+        time_str, date_str = parts[0], None
+
+    due_ts = parse_time_date(time_str, date_str, tzname)
 
     if not due_ts or not task_text:
-        await update.message.reply_text(
-            speak("Could not parse time/date. Try formats like '1700', '09:30', '5pm', 'tomorrow 7am', or '28 Oct 14:00'.")
-        )
-        return
+            await update.message.reply_text(
+                speak("Could not parse time/date. Try formats like '1700', '09:30', '5pm', 'tomorrow 7am', or '28 Oct 14:00'.")
+            )
+            return
 
     # Save to DB
     db.add_task(chat_id, task_text, due_ts)
