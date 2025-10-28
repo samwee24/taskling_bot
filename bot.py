@@ -517,9 +517,9 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/done – Mark a mission complete (choose from a list)\n"
         "/delete – Remove a mission completely (choose from a list)\n"
         "/reschedule – Select a mission to reschedule, then reply with a new time/date\n"
-        "/clear_all – Wipe all missions for today’s squad\n"
+        "/clear\\_all – Wipe all missions for today’s squad\n"
         "/squad – Show your current Taskling squad status\n"
-        "/reset_chat – Reset everything for a fresh start\n"
+        "/reset\\_chat – Reset everything for a fresh start\n"
     )
     await update.message.reply_text(help_text, parse_mode="Markdown")
 
