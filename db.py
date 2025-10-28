@@ -37,7 +37,18 @@ def init_db():
         role TEXT NOT NULL,
         joined_ts INTEGER NOT NULL
     );
-    """)
+
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id INTEGER,
+        text TEXT,
+        due_ts INTEGER,
+        remind_ts INTEGER,
+        status TEXT,
+        due_alerted INTEGER DEFAULT 0
+    )
+        """)
+
     conn.commit()
     conn.close()
     ensure_growth_columns()
@@ -160,14 +171,13 @@ def get_growth(chat_id):
 
 
 # --- Reminder queries ---
-def due_tasks_between(start_ts, end_ts):
+def due_tasks_between(start, end):
     conn = get_conn()
-    rows = conn.execute("""
-        SELECT id, chat_id, text, due_ts
-        FROM tasks
-        WHERE status='pending' AND due_ts IS NOT NULL
-          AND due_ts BETWEEN ? AND ?
-    """, (start_ts, end_ts)).fetchall()
+    rows = conn.execute(
+        "SELECT id, chat_id, text, due_ts FROM tasks "
+        "WHERE due_ts BETWEEN ? AND ? AND (due_alerted IS NULL OR due_alerted=0)",
+        (start, end)
+    ).fetchall()
     conn.close()
     return rows
 

@@ -219,6 +219,12 @@ def check_due():
             "reply_markup": keyboard
         })
 
+        # 🔑 Mark as alerted so it won’t fire again
+        conn = db.get_conn()
+        conn.execute("UPDATE tasks SET due_alerted=1 WHERE id=?", (tid,))
+        conn.commit()
+        conn.close()
+
 def apply_daily_decay():
     print(f"[DEBUG] apply_daily_decay triggered at {time.ctime()}")
     conn = db.get_conn()
