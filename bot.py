@@ -242,6 +242,15 @@ def split_task_and_when(args, tzname):
     Return (task_text, when_str) by trying the longest suffix that parses as a time/date.
     Handles both '10:53pm' and '10:53 pm'.
     """
+
+    raw = " ".join(args).strip()
+
+    # If the task is wrapped in parentheses, split cleanly
+    if raw.startswith("(") and ")" in raw:
+        task_text = raw[1:raw.index(")")].strip()
+        when_str = raw[raw.index(")")+1:].strip()
+        return task_text, normalize_shorthand(when_str)
+
     best = (None, None)
     for i in range(1, len(args) + 1):
         task_text = " ".join(args[:-i]).strip()
