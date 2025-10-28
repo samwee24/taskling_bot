@@ -857,11 +857,15 @@ def main():
 
 
     inject_notify(app)
+    scheduler.scheduler.remove_all_jobs()
+    print("[DEBUG] Cleared all old jobs at startup")
+
     scheduler.start()
 
     scheduler.app_ref = app
 
-    log_all_jobs()
+    for job in scheduler.scheduler.get_jobs():
+        print(f"[DEBUG] Job {job.id} → next run {job.next_run_time}")
 
     app.run_polling()
 
