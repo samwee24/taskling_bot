@@ -248,7 +248,7 @@ def split_task_and_when(args, tzname):
     return best
 
 async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Add a new mission with a due time/date, using time_utils.parse_when for consistency."""
+    """Add a new mission with a due time/date."""
     chat_id = update.effective_chat.id
     if len(context.args) < 2:
         await update.message.reply_text(speak("Usage: /add <task> <time> [date]"))
@@ -256,16 +256,16 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sh, tzname = db.get_prefs(chat_id)
 
-    # Split into task text and time/date string
-    task_text = " ".join(context.args[:-1])
-    when_str = context.args[-1]
+    # 👇 Use the same smart splitter as /remind
+    task_text, when_str = split_task_and_when(context.args, tzname)
 
-    # If there are 3+ args, last two are time/date
-    if len(context.args) >= 3:
-        task_text = " ".join(context.args[:-2])
-        when_str = " ".join(context.args[-2:])
+    if not task_text or not when_str:
+        await update.message.reply_text(
+            speak("Could not parse time/date. Try formats like '1700', '09:30', '5pm', 'tomorrow 7am', or '28 Oct 14:00'.")
+        )
+        return
 
-    # Use time_utils.parse_when for natural language parsing
+    # Break into time/date parts
     parts = when_str.split()
     if len(parts) == 2:
         time_str, date_str = parts
@@ -274,18 +274,17 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     due_ts = parse_time_date(time_str, date_str, tzname)
 
-    if not due_ts or not task_text:
-            await update.message.reply_text(
-                speak("Could not parse time/date. Try formats like '1700', '09:30', '5pm', 'tomorrow 7am', or '28 Oct 14:00'.")
-            )
-            return
+    if not due_ts:
+        await update.message.reply_text(
+            speak("Could not parse time/date. Try formats like '1700', '09:30', '5pm', 'tomorrow 7am', or '28 Oct 14:00'.")
+        )
+        return
 
     # Save to DB
     db.add_task(chat_id, task_text, due_ts)
     PACIFIC = pytz.timezone("US/Pacific")
     local_time = datetime.fromtimestamp(due_ts, PACIFIC).strftime("%Y-%m-%d %H:%M")
     await update.message.reply_text(speak(f"Mission added: {task_text} at {local_time}"))
-
 
 
 async def remind_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
