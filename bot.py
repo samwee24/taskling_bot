@@ -259,7 +259,6 @@ def split_task_and_when(args, tzname):
 
 
 async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Add a new mission with a due time/date."""
     chat_id = update.effective_chat.id
     if len(context.args) < 2:
         await update.message.reply_text(speak("Usage: /add <task> <time> [date]"))
@@ -267,7 +266,6 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sh, tzname = db.get_prefs(chat_id)
 
-    # Use the smart splitter
     task_text, when_str = split_task_and_when(context.args, tzname)
 
     if not task_text or not when_str:
@@ -276,7 +274,7 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # 👇 Use the same natural language parser as /remind
+    # 👇 Use natural language parser
     due_ts, _, _ = parse_when(when_str, tzname)
 
     if not due_ts:
@@ -285,14 +283,10 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Save to DB
     db.add_task(chat_id, task_text, due_ts)
     PACIFIC = pytz.timezone("US/Pacific")
     local_time = datetime.fromtimestamp(due_ts, PACIFIC).strftime("%Y-%m-%d %H:%M")
     await update.message.reply_text(speak(f"Mission added: {task_text} at {local_time}"))
-
-
-
 
 async def remind_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
