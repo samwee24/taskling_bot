@@ -232,11 +232,11 @@ def check_due():
             "reply_markup": keyboard
         })
 
-        # mark as alerted so it won’t fire again
         conn = db.get_conn()
         conn.execute("UPDATE tasks SET due_alerted=1 WHERE id=?", (tid,))
         conn.commit()
         conn.close()
+
 
 
 def apply_daily_decay():

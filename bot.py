@@ -785,19 +785,19 @@ from datetime import datetime, timedelta
 import time
 import db
 
+PACIFIC = pytz.timezone("US/Pacific")
+
 async def test_due_cmd(update, context):
-    """Create a dummy task due in 30 seconds to test due alerts."""
     chat_id = update.effective_chat.id
     due_ts = int(time.time()) + 30  # 30 seconds from now
 
     tid = db.add_task(chat_id, "⚔️ Test Due Mission", due_ts)
-    local_time = datetime.fromtimestamp(due_ts).strftime("%Y-%m-%d %H:%M:%S")
+    local_time = datetime.fromtimestamp(due_ts, PACIFIC).strftime("%Y-%m-%d %H:%M:%S")
 
     await update.message.reply_text(
-        f"🧪 Test mission #{tid} created, due at {local_time}. "
+        f"🧪 Test mission #{tid} created, due at {local_time} Pacific. "
         "You should see a due alert in ~30 seconds."
     )
-
 
 def inject_notify(app):
     import asyncio
