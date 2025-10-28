@@ -796,7 +796,7 @@ async def test_due_cmd(update, context):
 
     await update.message.reply_text(
         f"🧪 Test mission #{tid} created, due at {local_time} Pacific. "
-        "You should see a due alert in ~30 seconds."
+        "You should see a due alert in ~30 seconds. Please wait."
     )
 
 def inject_notify(app):
