@@ -7,6 +7,7 @@ from telegram.ext import (
     Application, CommandHandler, ContextTypes,
     MessageHandler, CallbackQueryHandler, filters
 )
+from time_utils import parse_when  # add this import at the top of bot.py
 import random
 import db
 import scheduler
@@ -238,8 +239,8 @@ def split_task_and_when(args, tzname):
             best = (task_text, when_str)
     return best
 
-
 async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Add a new mission with a due time/date, using time_utils.parse_when for consistency."""
     chat_id = update.effective_chat.id
     if len(context.args) < 2:
         await update.message.reply_text(speak("Usage: /add <task> <time> [date]"))
@@ -247,27 +248,28 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sh, tzname = db.get_prefs(chat_id)
 
-    # If 3+ args, last is date, second-to-last is time
+    # Split into task text and time/date string
+    task_text = " ".join(context.args[:-1])
+    when_str = context.args[-1]
+
+    # If there are 3+ args, last two are time/date
     if len(context.args) >= 3:
         task_text = " ".join(context.args[:-2])
-        time_str = context.args[-2]
-        date_str = context.args[-1]
-    else:
-        task_text = " ".join(context.args[:-1])
-        time_str = context.args[-1]
-        date_str = None
+        when_str = " ".join(context.args[-2:])
 
-    due_ts = parse_time_date(time_str, date_str, tzname)
-    if not due_ts:
+    # Use time_utils.parse_when for natural language parsing
+    due_ts, _, _ = parse_when(when_str, tzname)
+
+    if not due_ts or not task_text:
         await update.message.reply_text(
-            speak("Could not parse time/date. Use HHMM, HH:MM, or 5pm/6am, plus optional DDMMYY or 'tomorrow'.")
+            speak("Could not parse time/date. Try formats like '1700', '09:30', '5pm', 'tomorrow 7am', or '28 Oct 14:00'.")
         )
         return
 
+    # Save to DB
     db.add_task(chat_id, task_text, due_ts)
     local_time = time.strftime("%Y-%m-%d %H:%M", time.localtime(due_ts))
     await update.message.reply_text(speak(f"Mission added: {task_text} at {local_time}"))
-
 
 
 
