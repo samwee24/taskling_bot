@@ -64,6 +64,41 @@ RANKS = [
     (20, "⚔️ Legion"),
 ]
 
+def parse_when_any(raw: str, tzname: str):
+    """
+    Try natural language first, then numeric patterns:
+    - HHMM DDMMYY
+    - H(:MM)?(am|pm) DDMMYY
+    - HH:MM DDMMYY
+    Returns an int timestamp or None.
+    """
+    if not raw:
+        return None
+    s = normalize_shorthand(raw.strip())
+
+    # natural language via time_utils.parse_when
+    due_ts, _, _ = parse_when(s, tzname)
+    if due_ts:
+        return due_ts
+
+    # HHMM DDMMYY
+    m = re.match(r'^\s*(\d{3,4})\s+(\d{6})\s*$', s)
+    if m:
+        return parse_time_date(m.group(1), m.group(2), tzname)
+
+    # 12h with am/pm + date
+    m = re.match(r'^\s*(\d{1,2}(?::\d{2})?\s*(am|pm))\s+(\d{6})\s*$', s, re.I)
+    if m:
+        return parse_time_date(m.group(1), m.group(3), tzname)
+
+    # 24h with colon + date
+    m = re.match(r'^\s*(\d{1,2}:\d{2})\s+(\d{6})\s*$', s)
+    if m:
+        return parse_time_date(m.group(1), m.group(2), tzname)
+
+    return None
+
+
 def day_bounds(tzname):
     tz = pytz.timezone(tzname or "UTC")
     now = datetime.now(tz)
@@ -275,35 +310,25 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sh, tzname = db.get_prefs(chat_id)
 
     task_text, when_str = split_task_and_when(context.args, tzname)
+    due_ts = None
+    if task_text and when_str:
+        due_ts = parse_when_any(when_str, tzname)
 
-    if not task_text or not when_str:
-        await update.message.reply_text(
-            speak("Could not parse time/date. Try formats like '1700', '09:30', '5pm', 'tomorrow 7am', or '28 Oct 14:00'.")
-        )
-        return
-
-    # 👇 Normalize shorthand and feed directly to parse_when
-    when_str = normalize_shorthand(when_str)
-    due_ts, _, _ = parse_when(when_str, tzname)
-
-    # Fallback: handle patterns like "11:59pm 311025" or "1159 311025"
+    # fallback: try last 1–2 tokens
     if not due_ts:
-        m = re.match(r'^\s*(?P<time>[\d:]{3,5}\s*(?:am|pm)?)\s*(?P<date>\d{6})\s*$', when_str, re.I)
-        if m:
-            time_str = m.group('time').strip()
-            date_str = m.group('date').strip()
-            alt = parse_time_date(time_str, date_str, tzname)
-            if alt:
-                due_ts = alt
+        tail2 = " ".join(context.args[-2:])
+        tail1 = context.args[-1]
+        due_ts = parse_when_any(tail2, tzname) or parse_when_any(tail1, tzname)
+        if due_ts and not task_text:
+            task_text = " ".join(context.args[:-2]) or " ".join(context.args[:-1])
 
-    if not due_ts:
+    if not task_text or not due_ts:
         await update.message.reply_text(
             speak("Could not parse time/date. Try formats like '1700', '09:30', '5pm', 'tomorrow 7am', or '28 Oct 14:00'.")
         )
         return
 
     db.add_task(chat_id, task_text, due_ts)
-    PACIFIC = pytz.timezone("US/Pacific")
     local_time = datetime.fromtimestamp(due_ts, PACIFIC).strftime("%Y-%m-%d %H:%M")
     await update.message.reply_text(speak(f"Mission added: {task_text} at {local_time}"))
 
@@ -315,24 +340,30 @@ async def remind_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sh, tzname = db.get_prefs(chat_id)
 
-    # split_task_and_when returns (task_text, when_str)
     task_text, when_str = split_task_and_when(context.args, tzname)
+    due_ts = None
+    if task_text and when_str:
+        due_ts = parse_when_any(when_str, tzname)
 
-    # Parse the when_str into an integer timestamp
-    due_ts, _, _ = parse_when(when_str, tzname)
+    if not due_ts:
+        tail2 = " ".join(context.args[-2:])
+        tail1 = context.args[-1]
+        due_ts = parse_when_any(tail2, tzname) or parse_when_any(tail1, tzname)
+        if due_ts and not task_text:
+            task_text = " ".join(context.args[:-2]) or " ".join(context.args[:-1])
 
     print("DEBUG /remind → due_ts:", due_ts, type(due_ts), "when_str:", when_str)
 
-    if not due_ts or not task_text:
+    if not task_text or not due_ts:
         await update.message.reply_text(
             speak("Could not parse time/date. Use HHMM, HHMM DDMMYY, or natural language like 'tomorrow 5pm'.")
         )
         return
 
-    # Reminder time = due_ts as well (you can adjust if you want offset reminders)
     tid = db.add_task(chat_id, task_text, due_ts, due_ts)
     local_time = datetime.fromtimestamp(due_ts, PACIFIC).strftime("%Y-%m-%d %H:%M")
     await update.message.reply_text(speak(f"I’ll sound the horn for: {task_text} at {local_time}. Mission ID {tid}."))
+
 
 async def summary_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
